@@ -1,0 +1,141 @@
+title: Help Crate and earn a bounty
+description:
+heroImg: wrapper-hero-frontpage
+
+
+{% extends "base.html" %}
+
+{% block header %}
+<div class="wrapper wrapper-hero landing-page" id="{{ heroImg }}">
+  <div class="container">
+    <h1>The Distributed Database for Docker</h1>
+    <p class="lead">Want to help us make Crate even better?</p>
+  </div>
+</div>
+{% endblock %}
+
+
+{% block body %}
+<div class="wrapper wrapper-border wrapper-border-bottom">
+  <div class="container">
+    <div class="row">
+      <div class="col-sm-6">
+        <p class="lead">Whilst we have dedicated team working on Crate, there are frequently small tasks we never quite find the time for. We use Bountysource for managing these but below you find summaries of them, broken down per component and instructions on how to get started.</p>
+      </div>
+      <div class="col-sm-6">
+        <table id="cloudLogos">
+          <tr>
+            <td colspan="2"><img class="img-responsive thumbnail" src="{% media '/media/1503/bountysource-logo.png' %}" width="165" /></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrapper wrapper-border wrapper-border-bottom">
+  <div class="container">
+    <div class="row" id="core">
+      <div class="col-sm-4">
+        <img src="{% media '/media/1503/cloud_everywhere.png' %}" width="227">
+      </div>
+      <div class="col-sm-8">
+        <h2>Crate Core</h2>
+        <p>Find out more about how to get started with <a href="/docs/">installing</a> and <a href="/community/contribute/">developing</a> for Crate Core here.</p>
+        <ul class="w-list-unstyled list-group">
+          <li class="list-group-item bright">Add the ability to allow a 'NOT NULL' constraint to column declarations.<br/><a href="https://www.bountysource.com/issues/1859439-add-not-null-constraint" target="_blank">View on Bountysource</a></li>
+          <li class="list-group-item bright">Allow for the renaming of tables, ideally through an 'alter' style statement or perhaps 'create synonym' style syntax.<br/><a href="https://www.bountysource.com/issues/2226945-allow-renaming-of-tables">View on Bountysource</a></li>
+          <li class="list-group-item bright">To allow for a form of exception handling, functionality should be added to allow for "If table not exists" style SQL syntax, <a href="https://www.bountysource.com/issues/7640082-feature-request-create-table-if-not-exists-sql-functionality" target="_blank">View on Bountysource  </a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="row" id="python">
+      <div class="col-sm-4">
+        <img src="{% media '/media/1503/lang_python_large.png' %}" width="205">
+      </div>
+      <div class="col-sm-8">
+        <h2>Crate Python</h2>
+        <p>Find out more about how to get started with installing and developing for the Crate <a href="/python">Python adapters</a>.</p>
+        <ul class="w-list-unstyled list-group">
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="row" id="java">
+      <div class="col-sm-4">
+        <img src="{% media '/media/1503/lang-java-large.png' %}" width="205">
+      </div>
+      <div class="col-sm-8">
+        <h2>Crate JDBC</h2>
+        <p>Find out more about how to get started with installing and developing for the <a href="java">Crate JDBC adapters</a>.</p>
+        <ul class="w-list-unstyled list-group">
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-sm-4">
+        <img src="{% media '/media/1503/lang-java-large.png' %}" width="205">
+      </div>
+      <div class="col-sm-8">
+        <h2>Crate ActiveRecord</h2>
+        <p>Find out more about how to get started with installing and developing for the <a href="/java">Crate ActiveRecord adapter</a>.</p>
+        <ul class="w-list-unstyled list-group">
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="row" id="ruby">
+      <div class="col-sm-4">
+        <img src="{% media '/media/1503/lang-ruby-large.png' %}" width="205">
+      </div>
+      <div class="col-sm-8">
+        <h2>Crate Ruby</h2>
+        <p>Find out more about how to get started with installing and developing for the Crate <a href="/ruby">Ruby</a> adapters here.</p>
+        <ul class="w-list-unstyled list-group">
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="row" id="php">
+      <div class="col-sm-4">
+        <img src="{% media '/media/1503/lang-php-large.png' %}" width="205">
+      </div>
+      <div class="col-sm-8">
+        <h2>Crate PDO</h2>
+        <p>Find out more about how to get started with installing and developing for the <a href="/php">Crate PDO adapter</a>.</p>
+        <ul class="w-list-unstyled list-group">
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-sm-4">
+        <img src="{% media '/media/1503/lang-php-large.png' %}" width="205">
+      </div>
+      <div class="col-sm-8">
+        <h2>Crate DBAL</h2>
+        <p>Find out more about how to get started with installing and developing for the <a href="/php">Crate DBAL adapter</a>.</p>
+        <ul class="w-list-unstyled list-group">
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+          <li class="list-group-item bright">A great task, <a href="#">link</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
