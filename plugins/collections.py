@@ -25,6 +25,8 @@ import os
 import re
 import json
 
+from pprint import pformat
+
 from datetime import datetime
 from markdown2 import markdown
 
@@ -36,59 +38,94 @@ from django.utils.safestring import mark_safe
 
 from web.utils import toDict, parseDate, parsePost
 
-DIR = 'blog/'
 POSTS = []
 NEWS_JSON = []
 DEVELOPER_NEWS_JSON = []
 
-# https://github.com/trentm/python-markdown2/wiki/link-patterns
-link_patterns=[(re.compile(r'((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+(:[0-9]+)?|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)'),r'\1')]
 
-def filterPosts(posts, categ):
-    return filter(lambda x: categ in x.get('category'), posts)
+class Collection(object):
 
+    def __init__(self, title, path, pages=[], config={}):
+        self.title = title
+        self.path = path
+        self.pages = self.create_contexts(self._apply_filter(pages))
+        self.config = config
 
-def preBuild(site):
+    def _apply_filter(self, pages):
+        return [p for p in pages \
+                if p.path.startswith(self.path) \
+                and p.path.endswith('.html')]
 
-    global POSTS
-    global NEWS_JSON
-    global DEVELOPER_NEWS_JSON
-
-    # Build all the posts
-    for page in site.pages():
-        if page.path.startswith(DIR):
-
-            # Skip non html posts for obvious reasons
-            if not page.path.endswith('.html'):
-                continue
-
+    def create_contexts(self, pages):
+        contexts = []
+        for page in pages:
             # Parse headers and markdown body
             headers, body = parsePost(page)
 
             # Build a context for each post
-            postContext = Context()
-            postContext.update(headers)
-            postContext['raw_body'] = body
-            postContext['path'] = page.path
-            postContext['date'] = parseDate(headers.get('date') or headers.get('created'))
-            postContext['url'] = page.absolute_final_url
-            postContext['tags'] = headers.get('tags') and [h.strip() for h in headers['tags'].split(',')] or []
-            postContext['category'] = headers.get('category') and [h.strip() for h in headers['category'].split(',')] or []
-            POSTS.append(postContext)
+            ctx = Context()
+            ctx.update(headers)
+            ctx['raw_body'] = body
+            ctx['path'] = page.path
+            ctx['date'] = Collection.to_datetime(headers)
+            ctx['url'] = page.absolute_final_url
+            ctx['tags'] = Collection.to_list(headers, 'tags')
+            ctx['category'] = Collection.to_list(headers, 'category')
+            contexts.append(ctx)
+        return contexts
 
-    # Sort the posts by date
-    POSTS = sorted(POSTS, key=lambda x: x['date'])
-    POSTS.reverse()
+    @staticmethod
+    def to_list(headers, key):
+        if headers.get(key):
+            return [h.strip() for h in headers[key].split(',')]
+        return []
 
-    indexes = range(0, len(POSTS))
+    @staticmethod
+    def to_datetime(headers):
+        return parseDate(headers.get('date') or headers.get('created'))
 
-    for i in indexes:
-        if i+1 in indexes: POSTS[i]['prev_post'] = POSTS[i+1]
-        if i-1 in indexes: POSTS[i]['next_post'] = POSTS[i-1]
+    def filter(self, value, key='tags'):
+        return filter(lambda p: value in p.get(key), self.pages)
 
+    def sort(self, key='date', reverse=False):
+        self.pages = sorted(self.pages, key=lambda x: x[key])
+        if reverse:
+            self.pages.reverse()
+
+    def create_navigation(self):
+        indexes = range(0, len(self.pages))
+        for i in indexes:
+            if i+1 in indexes: self.pages[i]['prev_post'] = self.pages[i+1]
+            if i-1 in indexes: self.pages[i]['next_post'] = self.pages[i-1]
+
+    def __len__(self):
+        return len(self.pages)
+
+    def __getitem__(self, index):
+        return self.pages[index]
+
+    def __iter__(self):
+        return self.pages.__iter__()
+
+    def __repr__(self):
+        return '<{0}: {1}>'.format(self.title, pformat(self.pages))
+
+
+def preBuild(site):
     settings = site.config.get('settings', {})
-    NEWS_JSON = toDict(settings, filterPosts(POSTS, 'news'))
-    DEVELOPER_NEWS_JSON = toDict(settings, filterPosts(POSTS, 'developernews'))
+
+    global POSTS
+    POSTS = Collection('Blog', 'blog/', pages=site.pages(), config=site.config)
+    POSTS.sort('date', reverse=True)
+    POSTS.create_navigation()
+
+    global NEWS_JSON
+    NEWS_JSON = toDict(settings,
+                       POSTS.filter('news', key='category'))
+
+    global DEVELOPER_NEWS_JSON
+    DEVELOPER_NEWS_JSON = toDict(settings,
+                                 POSTS.filter('developernews', key='category'))
 
 
 def preBuildPage(site, page, context, data):
