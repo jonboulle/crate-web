@@ -35,6 +35,11 @@ from django.utils.safestring import mark_safe
 
 from web.utils import toDict, parseDate, parsePost
 
+try:
+    from urlparse import urlparse
+except ImportError:
+    from urllib.parse import urlparse
+
 COLLECTIONS = dict()
 NEWS_JSON = []
 DEVELOPER_NEWS_JSON = []
@@ -53,10 +58,19 @@ class Collection(object):
         self.pages = self.create_contexts(self._apply_filter(pages))
         self._build_page_index()
 
+    def is_html(self, p):
+            return urlparse(p.path).path.endswith('.html')
+
+    def is_markdown(self, p):
+            return urlparse(p.path).path.endswith('.md')
+
+    def get_post_output_path(self, path):
+        return path.replace('.md', '.html')
+
     def _apply_filter(self, pages):
         return [p for p in pages \
                 if p.path.startswith(self.path) \
-                and p.path.endswith('.html')]
+                and (self.is_html(p) or self.is_markdown(p))]
 
     def contains_page(self, page):
         """Check if page is part of the collection."""
@@ -76,7 +90,7 @@ class Collection(object):
             ctx = Context()
             ctx.update(headers)
             ctx[Collection.CONTEXT_RAW_KEY] = body
-            ctx['path'] = page.path
+            ctx['path'] = self.get_post_output_path(page.path)
             ctx['date'] = Collection.to_datetime(headers)
             ctx['url'] = page.absolute_final_url
             ctx['tags'] = Collection.to_list(headers, 'tags')
@@ -172,4 +186,3 @@ def preBuildPage(site, page, context, data):
     context['developer_news_json'] = DEVELOPER_NEWS_JSON
 
     return context, data
-
