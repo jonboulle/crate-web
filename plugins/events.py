@@ -57,7 +57,7 @@ def preBuild(site):
                 continue
 
             # Parse headers and markdown body
-            headers, body = parsePost(event)
+            headers, body = parsePost(event.data())
             ctx = Context()
             ctx.update(headers)
             ctx['raw_body'] = body

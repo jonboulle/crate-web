@@ -71,7 +71,7 @@ class Collection(object):
         contexts = []
         for page in pages:
             # Parse headers and markdown body
-            headers, body = parsePost(page)
+            headers, body = parsePost(page.data())
             # Build a context for each post
             ctx = Context()
             ctx.update(headers)
