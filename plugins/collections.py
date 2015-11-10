@@ -25,47 +25,57 @@ import os
 import re
 import json
 
-from pprint import pformat
-
 from datetime import datetime
 from markdown2 import markdown
 
 from django.template import Context
-from django.template.base import Library
 from django.template.loader import get_template
 from django.utils.encoding import force_text
 from django.utils.safestring import mark_safe
 
 from web.utils import toDict, parseDate, parsePost
 
-POSTS = []
+COLLECTIONS = dict()
 NEWS_JSON = []
 DEVELOPER_NEWS_JSON = []
 
 
 class Collection(object):
 
-    def __init__(self, title, path, pages=[], config={}):
+    CONTEXT_RAW_KEY = 'raw_body'
+    CONTEXT_OUTPUT_KEY = 'body'
+
+    def __init__(self, title, path, template, pages=[], config={}):
         self.title = title
         self.path = path
-        self.pages = self.create_contexts(self._apply_filter(pages))
+        self.template = template
         self.config = config
+        self.pages = self.create_contexts(self._apply_filter(pages))
+        self._build_page_index()
 
     def _apply_filter(self, pages):
         return [p for p in pages \
                 if p.path.startswith(self.path) \
                 and p.path.endswith('.html')]
 
+    def contains_page(self, page):
+        """Check if page is part of the collection."""
+        return page.path in self.__paths
+
+    def page_context(self, page):
+        """Throws ValueError if page is not part of the collection"""
+        idx = self.__paths.index(page.path)
+        return self.pages[idx]
+
     def create_contexts(self, pages):
         contexts = []
         for page in pages:
             # Parse headers and markdown body
             headers, body = parsePost(page)
-
             # Build a context for each post
             ctx = Context()
             ctx.update(headers)
-            ctx['raw_body'] = body
+            ctx[Collection.CONTEXT_RAW_KEY] = body
             ctx['path'] = page.path
             ctx['date'] = Collection.to_datetime(headers)
             ctx['url'] = page.absolute_final_url
@@ -73,6 +83,11 @@ class Collection(object):
             ctx['category'] = Collection.to_list(headers, 'category')
             contexts.append(ctx)
         return contexts
+
+    def _build_page_index(self):
+        self.__paths = []
+        for ctx in self.pages:
+            self.__paths.append(ctx['path'])
 
     @staticmethod
     def to_list(headers, key):
@@ -91,6 +106,7 @@ class Collection(object):
         self.pages = sorted(self.pages, key=lambda x: x[key])
         if reverse:
             self.pages.reverse()
+        self._build_page_index()
 
     def create_navigation(self):
         indexes = range(0, len(self.pages))
@@ -108,45 +124,52 @@ class Collection(object):
         return self.pages.__iter__()
 
     def __repr__(self):
-        return '<{0}: {1}>'.format(self.title, pformat(self.pages))
+        return '<{0}: {1} ({2} pages)>'.format(self.title, self.path, len(self.pages))
 
 
 def preBuild(site):
     settings = site.config.get('settings', {})
+    collections = site.config.get('collections', {})
 
-    global POSTS
-    POSTS = Collection('Blog', 'blog/', pages=site.pages(), config=site.config)
-    POSTS.sort('date', reverse=True)
-    POSTS.create_navigation()
+    global COLLECTIONS
+    for name, conf in collections.items():
+        coll = Collection(conf['title'], conf['path'], conf['template'],
+                          pages=site.pages(), config=site.config)
+        order = conf.get('order')
+        if order:
+            coll.sort(**order)
+        coll.create_navigation()
+        COLLECTIONS[name] = coll
 
     global NEWS_JSON
     NEWS_JSON = toDict(settings,
-                       POSTS.filter('news', key='category'))
+        COLLECTIONS['blog'].filter('news', key='category'))
 
     global DEVELOPER_NEWS_JSON
     DEVELOPER_NEWS_JSON = toDict(settings,
-                                 POSTS.filter('developernews', key='category'))
+        COLLECTIONS['blog'].filter('developernews', key='category'))
 
 
 def preBuildPage(site, page, context, data):
     """
-    Add the list of posts to every page context so we can
+    Add collections to every page context so we can
     access them from wherever on the site.
     """
-    context['posts'] = POSTS
+    for name, collection in COLLECTIONS.items():
+        context[name] = collection
+        if collection.contains_page(page):
+            ctx = collection.page_context(page)
+            tpl = get_template(ctx.get('template', collection.template))
+            raw = force_text(ctx[Collection.CONTEXT_RAW_KEY])
+            ctx[Collection.CONTEXT_OUTPUT_KEY] = mark_safe(
+                markdown(raw, extras=["fenced-code-blocks", "header-ids"])
+            )
+            context.update(ctx)
+            data = tpl.render(context)
+
+    # TODO: make this more generic!
     context['news_json'] = NEWS_JSON
     context['developer_news_json'] = DEVELOPER_NEWS_JSON
-
-    for post in POSTS:
-        if post['path'] == page.path:
-            tpl = get_template(post.get('template', 'post.html'))
-            raw = force_text(post['raw_body'])
-            post['body'] = mark_safe(markdown(raw,
-                extras=["fenced-code-blocks","header-ids"]))
-            context['__CACTUS_CURRENT_PAGE__'] = page
-            context['CURRENT_PAGE'] = page
-            context.update(post)
-            data = tpl.render(context)
 
     return context, data
 
