@@ -14,10 +14,10 @@ The build tool can be found in the repo [crate/crate-cactus](https://github.com/
 
 The `crate-web` Cactus site contains following plugins:
 
-* `collections.py`
+* `collection.py`
 * `events.py`
 
-### Collections
+### Collection
 
 Collections are groups of pages within a certain common path,
 e.g. the blog collection is located in `./pages/blog`.
