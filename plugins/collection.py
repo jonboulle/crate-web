@@ -36,6 +36,8 @@ from django.utils.safestring import mark_safe
 from web.utils import toDict, parseDate, parsePost
 
 COLLECTIONS = dict()
+COLLECTIONS_JSON = dict()
+# legacy stuff
 NEWS_JSON = []
 DEVELOPER_NEWS_JSON = []
 
@@ -135,6 +137,7 @@ def preBuild(site):
     collections = site.config.get('collections', {})
 
     global COLLECTIONS
+    global COLLECTIONS_JSON
     for name, conf in collections.items():
         coll = Collection(conf['title'], conf['path'], conf['template'],
                           pages=site.pages(), config=site.config)
@@ -143,6 +146,7 @@ def preBuild(site):
             coll.sort(**order)
         coll.create_navigation()
         COLLECTIONS[name] = coll
+        COLLECTIONS_JSON[name] = coll.serialize()
 
     global NEWS_JSON
     NEWS_JSON = toDict(settings,
@@ -158,9 +162,10 @@ def preBuildPage(site, page, context, data):
     Add collections to every page context so we can
     access them from wherever on the site.
     """
+    for name, collection_json in COLLECTIONS_JSON.items():
+        context[name+'_json'] = collection_json
     for name, collection in COLLECTIONS.items():
         context[name] = collection
-        context[name+'_json'] = collection.serialize()
         if collection.contains_page(page):
             ctx = collection.page_context(page)
             tpl = get_template(ctx.get('template', collection.template))
