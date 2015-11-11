@@ -114,6 +114,9 @@ class Collection(object):
             if i+1 in indexes: self.pages[i]['prev_post'] = self.pages[i+1]
             if i-1 in indexes: self.pages[i]['next_post'] = self.pages[i-1]
 
+    def serialize(self):
+        return toDict(self.config.get('settings', {}), self.pages)
+
     def __len__(self):
         return len(self.pages)
 
@@ -157,6 +160,7 @@ def preBuildPage(site, page, context, data):
     """
     for name, collection in COLLECTIONS.items():
         context[name] = collection
+        context[name+'_json'] = collection.serialize()
         if collection.contains_page(page):
             ctx = collection.page_context(page)
             tpl = get_template(ctx.get('template', collection.template))
