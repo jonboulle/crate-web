@@ -81,8 +81,8 @@ class Collection(object):
             ctx['path'] = page.path
             ctx['date'] = Collection.to_datetime(headers)
             ctx['url'] = page.absolute_final_url
-            ctx['tags'] = Collection.to_list(headers, 'tags')
-            ctx['category'] = Collection.to_list(headers, 'category')
+            for list_type in ['tags', 'category', 'topics']:
+                ctx[list_type] = Collection.to_list(headers, list_type)
             contexts.append(ctx)
         return contexts
 
