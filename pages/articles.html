@@ -1,0 +1,54 @@
+title: Articles
+{% extends "base.html" %}
+
+{% block header %}
+<div class="wrapper wrapper-bg-primary">
+  <div class="container">
+    <div class="row">
+      <div class="col-sm-12">{{ articles.title }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block body %}
+<div class="wrapper wrapper-border">
+<div class="container">
+
+  <div class="row">
+    <div class="col-sm-6">
+
+      <h1>All Articles</h1>
+      <ul class="list-unstyled">
+        {% for post in articles.pages %}
+        <li class="row-list-item">
+          <div class="list-header">
+            <h2><a href="{{ post.url }}">{{ post.title }}</a></h2>
+          </div>
+          <p class="excerpt">{{ post.description }}</p>
+        </li>
+        {% endfor %}
+      </ul>
+
+    </div>
+    <div class="col-sm-6">
+
+      <h1>Topic: MySql</h1>
+      <ul class="list-unstyled">
+        {% for post in articles.pages|filter_by_topic:"mysql" %}
+        <li class="row-list-item">
+          <div class="list-header">
+            <h2><a href="{{ post.url }}">{{ post.title }}</a></h2>
+          </div>
+          <p class="excerpt">{{ post.description }}</p>
+        </li>
+        {% endfor %}
+      </ul>
+
+    </div>
+  </div>
+
+</div>
+</div>
+{% endblock %}
+
