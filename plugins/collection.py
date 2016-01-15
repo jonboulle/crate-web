@@ -134,7 +134,6 @@ class Collection(object):
         else:
             filepath = os.path.abspath(os.path.join(self.root_path, 'pages', toc_file))
 
-        print (filepath)
         lines = []
         with open(filepath) as fp:
             [lines.append(line.rstrip()) for line in fp]
