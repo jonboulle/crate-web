@@ -1,20 +1,18 @@
+title: Benchmarks
+description: bla bla bla SEO
+
 {% extends "base.html" %}
 
-{% block header %}
-
-<script type="text/javascript"
-  src="{% static 'js/dygraph-combined-dev.js' %}"></script>
-{% endblock %}
 {% block body %}
+<div id="graphdiv2" style="width:500px; height:300px;"></div>
+{% endblock %}
 
-<div id="graphdiv2"
-  style="width:500px; height:300px;"></div>
-
-        <script type="text/javascript">
-         g2 = new Dygraph(
-                document.getElementById("graphdiv2"),
-                "{% static 'data/temperatures.csv' %}",
-        {}          // options
-        );
-        </script>
+{% block scripts %}
+<script type="text/javascript" src="{% static 'js/dygraph-combined-dev.js' %}"></script>
+<script type="text/javascript">
+  $(document).ready(function() {
+    var elem = document.getElementById("graphdiv2");
+    var g2 = new Dygraph(elem, "{% static 'data/temperatures.csv' %}", {});
+  });
+</script>
 {% endblock %}
