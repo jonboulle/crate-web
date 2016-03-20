@@ -61,11 +61,11 @@ azure group deployment create -f azuredeploy.json \
   -g <resourcegroup>
 ```
 
-For the convenience of our team and to allow for reproduction of individual clusters, we broke these templates into cluster functions. I.e. one template for creating the network infrastructure, one for installing Docker components etc. (**Github link?**)
+For the convenience of our team and to allow for reproduction of individual clusters, we broke these templates into cluster functions. I.e. one template for creating the network infrastructure, one for installing Docker components etc.
 
 ### Problems
 
-Plan A started well, but after a few hundred nodes we started to run into problems from different sources. First the network overhead of running traffic through the [Docker container bridge](https://docs.docker.com/engine/userguide/networking/dockernetworks/#a-bridge-network) proved to much and the Microsoft engineers recommended we switched to running Crate from Linux packages. Next there were problems with the Consul cluster as we had not configured it optimally to run on a multi-core machine and so it was struggling to meet the demand put upon it. After many hours debugging leading to a small config change (**What was it?**) we were able to get Consul running using all cores and reacting far more responsively. Finally despite being a great service, the Ruxit service couldn't cope with the traffic we were generating and the 29 metrics we wanted to collect. At around 500 nodes we were hitting their API so hard it shut down, so this wasn't a viable option for us, or for Ruxit.
+Plan A started well, but after a few hundred nodes we started to run into problems from different sources. First the network overhead of running traffic through the [Docker container bridge](https://docs.docker.com/engine/userguide/networking/dockernetworks/#a-bridge-network) proved to much and the Microsoft engineers recommended we switched to running Crate from Linux packages. Next there were problems with the Consul cluster as we had not configured it optimally to run on a multi-core machine and so it was struggling to meet the demand put upon it. After many hours debugging leading to a small config change we were able to get Consul running using all cores and reacting far more responsively. Finally despite being a great service, the Ruxit service couldn't cope with the traffic we were generating and the 29 metrics we wanted to collect. At around 500 nodes we were hitting their API so hard it shut down, so this wasn't a viable option for us, or for Ruxit.
 
 ## Plan B
 
@@ -78,7 +78,7 @@ With lessons learned it was time to make a few changes and start again, to summa
 
 The main issues encountered with this plan was the shear amount of connections and network traffic generated in a cluster of this size. For example, if the Consul, Docker Swarm or Crate master switches to a different node because of an issue, it will inform every node in the cluster, generating a lot of traffic across the network. The engineers at Microsoft were able to help us with this issue by changing some settings in the VM image kernel (**What was this?**) which improved cluster stability.
 
-This improved speeds and network stability and so we started to import our data set and hit upon a so far uncovered bug with our `COPY FROM` command (**What was it?**). Whilst the core team worked on solving this bug, we switched to using the [GitHub archive data set](https://www.githubarchive.org/) which offered more flexibility for import options so we could keep pushing forwards.
+This improved speeds and network stability and so we started to import our data set and hit upon a so far uncovered bug with our `COPY FROM` command. Whilst the core team worked on solving this bug, we switched to using the [GitHub archive data set](https://www.githubarchive.org/) which offered more flexibility for import options so we could keep pushing forwards.
 
 ## Next Steps
 - RRD data extraction to analyze main issues between stability.
