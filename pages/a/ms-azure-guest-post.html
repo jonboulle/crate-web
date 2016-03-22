@@ -13,47 +13,57 @@ Crate.io has been striving to create the most scalable database in our industry.
 
 We have clients who write and query gigabytes of data a minute, store terabytes a day and love the performance and stability that Crate offers. But the question always remained at the back of our minds, when taken to the extreme, what is Crate really capable of?
 
-Our aims were to:
+We specifically wanted to:
 
-- See how Crate would distribute shards and partitions across such a large cluster
-- Examine the overhead added by a the cluster management
-- See what speeds the cluster could write data at
-- Another
-- And another
+- Know how Crate would distribute shards and partitions across such a large cluster.
+- Examine the overhead added by a the cluster management.
+- See at what speeds the cluster could write data.
 
-Microsoft Azure were generously lent us the use of 8000 cores as the infrastructure for this test and engineer time to guide us through problems and questions we might have.
+Microsoft Azure generously lent us the use of 8000 cores as the infrastructure for this test and engineer time to guide us through problems and questions we might have.
 
-Microsoft hoped to prove that their Azure platform was reliable enough for a project of such rapid scaling and resource intensive.
+Microsoft wanted to show that their Azure platform was reliable and capable enough for a project that would scale so rapidly and be so resource intesive.
 
-So, what happened and how did we do it?
+## Set Up
 
-We aimed to create a 1001 node Crate cluster and xxx. Setting up such a cluster on any kind of infrastructure requires planning and whilst cloud hosts simplify this process, understanding how to translate your requirements into their paradigms requires research and experimentation.
+We aimed to create a 1001 node Crate cluster ready for data import and manipulation. Setting up such a cluster on any kind of infrastructure requires planning and whilst cloud hosts simplify this process, understanding how to translate your requirements into their paradigms requires research and experimentation.
 
-Azure has several concepts that we needed to enable and configure to get our cluster started:
+Azure has several concepts that we needed to understand and make use of to get our cluster started:
 
 - **Resource Group**: A 'container' that holds related resources of all types for an application.
 - **Storage Account**: A data storage solution allocated to you that can contain Blob, Table, Queue, and File data. Can be stored on SSDs or HDDs.
-- **Virtual Network**: A representation of a network in the cloud, where you can define DHCP address blocks, DNS settings, security policies, and routing.
+- **Virtual Network (vnet)**: A representation of a network in the cloud, where you can define DHCP address blocks, DNS settings, security policies, and routing.
 - **Subnet**: Further segmentation for virtual networks.
 - **Virtual Machine (VM)**: Represents a particular operating system or application stack.
 - **Network Interface (NIC)**: Represents a network interface that can be associated to one or more virtual machines (VM).
 - **Network Security Group (NSG)**: Contains a list of rules that allow or deny network traffic to your VMs in a Virtual Network. Can be associated with subnets or individual VM instances within that subnet.
 
+And some limitations that influenced our architecture decisions:
+
+- 8000 CPU cores
+- 10000 VMs
+- 100 VMs in single availability set
+- 800 resources in single resource group
+- 4096 IP addresses in a vnet
+
+This led us to create what we termed a 'scaling unit' that contained all the VMS and resources required to support 100 Crate nodes. This meant we had 10 scaling units across the cluster.
+
+![IMAGE?](IMAGE?)
+
 ## Data Set
 
-70 terabytes of compressed data from the [common crawl database](http://commoncrawl.org/the-data/).
+The data set we intended to experiment with was 70 terabytes of compressed data from the [common crawl database](http://commoncrawl.org/the-data/) and the [GitHub archive](https://www.githubarchive.org/) as a simpler backup.
 
 ## Plan A
 
-Our initial approach was to create a series of scripts to do setup the following:
+Our initial approach was to create a series of scripts to setup the following:
 
 1. A 3 node [Consul](https://www.consul.io/) cluster to manage the cluster and handle service discovery.
-2. 3 Docker swarm master nodes to create VM instances quickly via docker machine.
+2. 3 Docker swarm master nodes to create VM instances via the Azure CLI.
 3. Gradually scale the cluster by creating docker instances running Crate and managed by the Swarm master.
-4. A 3 node monitoring and metrics cluster, we settled on [Ruxit](https://ruxit.com/).
+4. All nodes running a [Ruxit](https://ruxit.com/) agent monitoring service.
 5. Import our data set using Crate's `Copy From` command.
 
-After a two day coding session with Microsoft staff in Vienna, they recommended we instead switched to using [Azure Templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/), a json formatted file that provisions all the resources and commands to be run for your application in a single operation. These templates can be used in conjunction with the Azure command line tool to rigger a complex cluster quickly, for example:
+After a two day coding session with Microsoft staff in Vienna, they recommended we instead switched to using [Azure Templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/), a json formatted file that provisions all the resources and commands to be run for your application in a single operation. These templates can be used in conjunction with the Azure command line tool to trigger a complex cluster quickly, for example:
 
 ```bash
 azure group deployment create -f azuredeploy.json \
@@ -61,29 +71,51 @@ azure group deployment create -f azuredeploy.json \
   -g <resourcegroup>
 ```
 
-For the convenience of our team and to allow for reproduction of individual clusters, we broke these templates into cluster functions. I.e. one template for creating the network infrastructure, one for installing Docker components etc.
+For the convenience of our team and to allow for reproduction of individual clusters, we broke these templates into logical self contained units defined by their function. i.e. one template for creating the network infrastructure, one for installing Docker components etc.
 
 ### Problems
 
-Plan A started well, but after a few hundred nodes we started to run into problems from different sources. First the network overhead of running traffic through the [Docker container bridge](https://docs.docker.com/engine/userguide/networking/dockernetworks/#a-bridge-network) proved to much and the Microsoft engineers recommended we switched to running Crate from Linux packages. Next there were problems with the Consul cluster as we had not configured it optimally to run on a multi-core machine and so it was struggling to meet the demand put upon it. After many hours debugging leading to a small config change we were able to get Consul running using all cores and reacting far more responsively. Finally despite being a great service, the Ruxit service couldn't cope with the traffic we were generating and the 29 metrics we wanted to collect. At around 500 nodes we were hitting their API so hard it shut down, so this wasn't a viable option for us, or for Ruxit.
+Plan A started well, but after a few hundred nodes we started to run into problems with having too many distributed systems competing for use of the network. Each Swarm node was communicating with the Consul cluster, and once a Docker instance started it also monitors several data points and communication between processes.
+
+After configuring Consul to use multiple cpu cores (by changing the GoLang `GOMAXPROCS` environment variable to the number of usable cores) it became more performant and stable.
+
+When Crate nodes started they were also communicating with Docker and the Swarm cluster, so as the cluster scaled, so did the network traffic and the demand on the cluster as a whole.
+
+This caused problems for Ruxit as it monitors each process and the connections between them. This led to generating a massive amount of data on the network and sent to Ruxit's API, which was not great for either of us.
+
+We estimate that at peak, we had 29,000 open connections on the Swarm master nodes, this mean that even a basic query, such as asking Crate how many nodes were in the cluster, took 2000-15000ms. Delay across the Crate cluster was so slow, we couldn't even create tables.
+
+![ADD IMAGE](ADD IMAGE)
 
 ## Plan B
 
-With lessons learned it was time to make a few changes and start again, to summarize, this is what we changed:
+We wanted to be certain that the high network traffic was not due to Crate, so our next plan was to go back to basics and eliminate other potential sources of noise.
 
-- Replaced Ruxit with [Ganglia](http://ganglia.info/) for monitoring the cluster.
-- Launch Crate from Linux packages instead of Docker containers
+This is what we changed:
+
+- Replaced Ruxit with a [Ganglia](http://ganglia.info/) cluster for monitoring. This consisted of 12 ganglia nodes, one for each scale unit, and one compiling the results.
+- Remove Docker components and instead launch Crate from Linux packages
+- Remove Consul cluster
 
 ### Problems
 
-The main issues encountered with this plan was the shear amount of connections and network traffic generated in a cluster of this size. For example, if the Consul, Docker Swarm or Crate master switches to a different node because of an issue, it will inform every node in the cluster, generating a lot of traffic across the network. The engineers at Microsoft were able to help us with this issue by changing some settings in the VM image kernel (**What was this?**) which improved cluster stability.
+This improved speeds and network stability, with querying Crate for how many nodes were in the cluster reduced to 200-400ms.
 
-This improved speeds and network stability and so we started to import our data set and hit upon a so far uncovered bug with our `COPY FROM` command. Whilst the core team worked on solving this bug, we switched to using the [GitHub archive data set](https://www.githubarchive.org/) which offered more flexibility for import options so we could keep pushing forwards.
+At this point we were running out of time to experiment with our Azure infrastructure, so had to call it a day with a few remaining major issues to solve.
+
+## How Much?
+
+For those interested and keeping count, here's the total Azure VMs we made use of and [how Azure references them](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-size-specs/#standard-tier-dv2-series):
+
+- **12x Ganglia VMs**: _Standard_D4_v2_ (8 cores, 28GB RAM, 400GB local SSD)
+- **3x Swarm Manager VMs**: _Standard_D14_v2_ (16 cores, 112GB RAM, 800GB local SSD)
+- **3x Crate Master VMs**: _Standard_D5_v2_ (16 cores, 56GB RAM, 800GB local SSD)
+- **1100x Crate Node VMs**: _Standard_D12_v2_ (4 cores, 28GB RAM, 200GB local SSD)
+
+That all adds up to a gigantic... **4448** cores and **30968GB** RAM, **just** for the Crate instances.
 
 ## Next Steps
-- RRD data extraction to analyze main issues between stability.
-- complete allocation of shards and partitions and cluster overhead.
-- How many shards on a node equals what in terms of performance.
-- Crate Master switched a lot, why?
 
-We can't say this was production ready and made lots of queries, no, not possible. Wasn't stable enough.
+We're pretty sure no one has tried to run a such a large stateful application on Docker before and so of course, we ran into problems. Whilst our second plan worked better, it wasn't the solution we hoped for.
+
+Although we encountered a lot of obstacles along the way that prevented us from getting a cluster that we could properly use with Crate (running queries etc), we learnt **a lot** about preparing and running Crate at vast scale that will help us improve our product and better support our users.
