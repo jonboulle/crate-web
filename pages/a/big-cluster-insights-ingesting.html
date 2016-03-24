@@ -1,0 +1,157 @@
+title: The big bite: Ingesting performance of large clusters
+link: https://crate.io/a/big-bite-ingesting-performance
+author: Nils Magnus
+description: Performance insights from tests with big clusters
+created: 2016/03/24 12:17:43
+post_name: big-bite-ingesting-performance
+status: publish
+post_type: post
+tags: cluster, ingest, insert, loading, import, scaling, virtual machines
+category: news, developernews
+
+![Create Virtual Network]({% media '/media/1603/array-of-cakes-cc-by-sa-2.0-kristin-ausk.jpg' %})
+
+*[CC by-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/), Kristin Ausk*
+
+Database performance depends on many factors. There are many
+parameters user can tweak, but the outcome in complex setups is not
+always obvious. While we had a big cluster of crate instances
+available, we faced the challenge to load huge amounts of data into it
+to initialize the distributed database. In a series of experiments we
+explored the effect of network connections, number of nodes, and
+insert performance. Surprisingly, more means not always better.
+
+# Setup
+
+We used the [Azure](http://) platform, kindly provided by Microsoft
+for the evaluation to build a set of strong G3 class servers to
+generate test data that was sent to our cluster of crate
+instances. The database cluster consisted of three master nodes for
+the purpose of monitoring and propagating cluster changes. In our
+setup they effectively had only work to do during the setup of the
+cluster since after that they mostly idled during the experiment. A
+small cluster of Ganglia nodes took care of the performance
+monitoring.
+
+We chose D12v2 nodes as VM types for the data nodes (as well as the
+master nodes). They come with four cores, 28 GB RAM, and 200 GB local
+SSD storage. We dedicated half of the RAM to the Java heap size by
+setting the environment to `CRATE_HEAP_SIZE=14g`, because that way
+crate can most use of the available data and XXXXXX. Local attached
+storage is crucial for good crate performance. Our SSD had been
+specified with 12,000 iops.
+
+The even bigger G3 VMs created a simple table on the cluster like
+this:
+
+```sql
+CREATE TABLE loadtest (
+    data string)
+CLUSTERED INTO x SHARDS WITH (num_of_replicas=0);
+```
+
+As the number of shards ("*x*") needs to be defined at table creation
+time, we ran a number of tests with different configurations. We've
+got good results with twice the number of shards as the number of data
+nodes, as a rule of thumb: A higher number of shards enables the
+cluster to better distribute the data to the nodes and thus balance
+the load over the cluster. With too many shards, the overhead eats up
+that advantage, though. We discuss this factor in more detail later on
+in this article.
+
+# Pump it up!
+
+The python powered load generation machines produced a long series of
+bulk insert request like this:
+
+```sql
+INSERT INTO loadtest (data)
+VALUES('1st random data string of n bytes',
+       '2nd random data string of n bytes',
+       '...',
+       'mth random data string of n bytes');
+```
+
+Our reference setup was inserting 1000 times 512 bytes in one batch,
+resulting in 2.5 MB per bulk insert. It's very noteworth to add that
+there is a huge difference in inserting one thousand times a single
+record compared to inserting all of them in a single request, since
+XXXXXXX XXXXXXX. As there are XXXXX block merge processes (how are
+they called?) XXXXX running in the background, it is important to set
+`store.throttle.max_bytes_per_sec` to a reasonably high value [during
+an import](https://crate.io/a/optimize-big-clusters/). We used 700 MB
+in our setup. With `memory.index_buffer_size: 25%` we XXXXXXXXX did
+what? XXXXXXXX. The store module controls how index data is stored and
+accessed on disk. The `mmapfs` option for `index.store.type` ensures
+that XXXXXXX XXXXXXXXX. And finally `bootstrap.mlockall: true` makes
+the JVM lock its memory and thus prevent it from being swapped by the
+operating system.
+
+
+XXXX Are these also important?
+
+  * indices.recovery.concurrent_streams: 20 - The number of streams to open (on a node level) to recover a shard from a peer shard.
+  * indices.recovery.max_bytes_per_sec: 350mb 
+XXXXX
+
+It is a real challenge to actually feed the Crate database cluster
+with enough data. Our threaded python generator opened 1,024 sessions
+to the endpoint in parallel (spawning 32 processes each with 32
+threads) and repeated that procedure 50 times. Especially creating the
+bulk request takes some time in the Python script.
+
+To measure the performance of the cluster and not the client
+libraries, we delivered the SQL statement directly to the HTTP
+endpoint of the data nodes. The load generators connected to the data
+nodes of the cluster in a round robin fashion.
+
+That way we transmitted roughly 24 GB net data to our cluster
+consisting of initially 14 data nodes, resulting in 51,2 million
+records in the Crate cluster. Doing so takes about half a minute and
+eventually results in 1,60 million records per second. This was our
+reference value to beat.
+
+# Doubling the number of data nodes
+
+XX Check a: variable: number of data nodes
+
+One obvious approach is to increase the number of data nodes in the
+cluster. The reference setup had 14 modes with 12,000 iops each. We
+configured 28 shards, resulting in 1.85 million records per
+second. Could we improve if we doubled that? Indeed, as the same setup
+with 28 data nodes and 56 shards accelerates the ingestion rate to
+3.01 million records per second (see figure 1). Performance
+definetively benefits from horizontal scaling the data nodes. The gain
+is slightly sub-linear since there is some slight overhead XXXXXXX in
+what?  XXXXXXX.
+
+![Figure 1: Ingest performance depending on number of nodes]({% media '/media/XXXX/ingest-fig-1.png' %})
+
+# In search of key factors
+
+While it's easy to understand that more workers finish a given job
+more swiftly, we wondered how adjusting the way they work affects
+their performance. A crucial question is to decide the number of
+shards in a table. Since [their number needs to be defined at creation
+time of a
+table](https://crate.io/a/sharding-and-replication-with-crate-data/),
+we examined the effect of different setups in a large cluster. As a
+rule of thumb, having at least two shards per node resulted in best
+performance numbers (see figure 2).
+
+![Figure 2: Tuning ingest performance depending on number of
+shards]({% media '/media/XXXX/ingest-fig-2.png' %})
+
+DBAs should act with caution, though. The number layout depends on the
+actual data schema, as we described in a [blog post about
+XXXXXXXX](http://xxxx).
+
+# Conclusion
+
+Ingestion rates depend on many factors, the number of data nodes
+having the most important impact. A good choice of shards also affects
+the performance in a noteworth way. Finally, the hardware specs of the
+nodes themselves obviosly also affect your results: Look out for lots
+of iops and a balanced amount of CPU and memory. All that taken into
+account we've been able to ingest up to 4,800,750.12 records/sec on a
+cluster of 56 D14v2 nodes with 16 cores each. Cool.
