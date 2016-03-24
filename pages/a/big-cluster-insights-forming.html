@@ -1,0 +1,77 @@
+title: Going big: Deploying a huge cluster
+link: https://crate.io/a/going-big-deploying-a-huge-cluster
+author: Aslan Bakirov
+description: Insights from setting up a huge Crate cluster
+created: 2016/03/25 10:17:53
+post_name: going-big-deploying-a-huge-cluster
+status: publish
+post_type: post
+tags: cluster, planning, scaling, stability, virtual machines
+category: news, developernews
+
+![Create Virtual Network]({% media '/media/XXXX/XXXXXX-XXXXX-cc-by-sa-2.0-XXXXXX-XXXXXX.jpg' %})
+
+*[CC by-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/), XXXXXX XXXXXXXX*
+
+
+# experiment: deploying and stability of a big cluster
+
+(this blog post mainly follows the presentation that haudi gave during review on March 23, 2016).
+
+objective of this experiment: to form a really huge cluster of at
+least 1000 nodes. how stable behaves crate (and the two underlying
+layers) in such an environment?
+
+we set up two sub-experients:
+
+a) use docker swarm to orchestrate a cluster, and run one crate instance in one docker instance in one azure vm instance.
+
+b) eliminate the middle layer and roll out crate directly on the VMs by means of ubuntu packages and distributed ssh.
+
+
+### Investigate & Prepare Network Input
+
+#### Crate with Docker
+
+Objective was just to do a
+
+> Select count(*) from sys.nodes;
+
+on the cluster, no actual workload was inserted or selected.
+
+Crate with Docker Swarm and Consul setup:
+
+    * 3 Consul Agents/3 Swarm managers. VM instance type: Standard_D14_v2.
+    *  ~1100 swarm nodes. VM instance type: Standard_D12_v2.    
+    * ~1000 crate data nodes, 3 crate master nodes.
+ 
+Observations:
+
+    * ~29k open connections on each of three Nodes running a Consul agent and Swarm manager. Each node in cluster had around ~29 open connections. 
+    * Using default consul setup resulted in constant reelection of the master and leaded to unstable behaviour of the Docker Swarm cluster. Setting up the **GOMAXPROCS** property to the number of cores allowed Consul agents to utilize VMs CPUs and increase stability of the cluster.
+    * ganglia graphs here... network load 
+    * "Select count(*) from sys.nodes " query took 20-30 sec or simply hangs.
+
+#### Crate via ppa
+
+Crate setup:
+
+    * 3 Crate masters. VM instance type: Standard_D14_v2.
+    * ~1100 swarm nodes. VM instance type: Standard_D12_v2.
+ 
+Observations:
+
+    * ~26k open connections on the Crate master VM on port 4300.
+    * "Select count(*) from sys.nodes " query took ~300ms or simply hangs.
+
+
+
+
+    
+400 nodes only 
+X-bytes-io is the sum of the network i/o measured on all three crate master nodes charted over time.
+
+Friday evening, 4:50pm we started the 400 node cluster, naked
+Check 16:50 - 17:00 in more detail → ask claus
+
+Graph of network load during cluster start
