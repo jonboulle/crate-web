@@ -24,7 +24,7 @@ insert performance. Surprisingly, more means not always better.
 # Setup
 
 We used the [Azure](http://) platform, kindly provided by Microsoft
-for the evaluation to build a set of strong G3 class servers to
+for the evaluation to build a set of strong G-series VMs to
 generate test data that was sent to our cluster of crate
 instances. The database cluster consisted of three master nodes for
 the purpose of monitoring and propagating cluster changes. In our
@@ -35,11 +35,13 @@ monitoring.
 
 We chose D12v2 nodes as VM types for the data nodes (as well as the
 master nodes). They come with four cores, 28 GB RAM, and 200 GB local
-SSD storage. We dedicated half of the RAM to the Java heap size by
-setting the environment to `CRATE_HEAP_SIZE=14g`, because that way
-crate can most use of the available data and XXXXXX. Local attached
-storage is crucial for good crate performance. Our SSD had been
-specified with 12,000 iops.
+SSD storage.
+We assigned half of total RAM to the Crate heap and left the other
+half of the memory for Lucene to leverage the underlying OS for
+caching in-memory data structures. The following memory split guarantees
+the optimal Crate performance.
+Local attached storage is crucial for good crate performance. Our
+SSD had been specified with 12,000 iops.
 
 The even bigger G3 VMs created a simple table on the cluster like
 this:
@@ -73,26 +75,19 @@ VALUES('1st random data string of n bytes',
 ```
 
 Our reference setup was inserting 1000 times 512 bytes in one batch,
-resulting in 2.5 MB per bulk insert. It's very noteworth to add that
+resulting in 2.5 MB per bulk insert. It's very noteworthy to add that
 there is a huge difference in inserting one thousand times a single
 record compared to inserting all of them in a single request, since
 XXXXXXX XXXXXXX. As there are XXXXX block merge processes (how are
 they called?) XXXXX running in the background, it is important to set
 `store.throttle.max_bytes_per_sec` to a reasonably high value [during
 an import](https://crate.io/a/optimize-big-clusters/). We used 700 MB
-in our setup. With `memory.index_buffer_size: 25%` we XXXXXXXXX did
-what? XXXXXXXX. The store module controls how index data is stored and
-accessed on disk. The `mmapfs` option for `index.store.type` ensures
-that XXXXXXX XXXXXXXXX. And finally `bootstrap.mlockall: true` makes
-the JVM lock its memory and thus prevent it from being swapped by the
-operating system.
-
-
-XXXX Are these also important?
-
-  * indices.recovery.concurrent_streams: 20 - The number of streams to open (on a node level) to recover a shard from a peer shard.
-  * indices.recovery.max_bytes_per_sec: 350mb 
-XXXXX
+in our setup. With `memory.index_buffer_size: 25%` Crate allocates the
+certain percentage of the total heap for the indexing buffer. The store
+module controls how index data is stored and accessed on disk. The `mmapfs`
+option for `index.store.type` defines the Lucene index on the file system maps
+into memory. And finally `bootstrap.mlockall: true` makes the JVM lock
+its memory and thus prevent it from being swapped by the operating system.
 
 It is a real challenge to actually feed the Crate database cluster
 with enough data. Our threaded python generator opened 1,024 sessions
@@ -121,7 +116,7 @@ configured 28 shards, resulting in 1.85 million records per
 second. Could we improve if we doubled that? Indeed, as the same setup
 with 28 data nodes and 56 shards accelerates the ingestion rate to
 3.01 million records per second (see figure 1). Performance
-definetively benefits from horizontal scaling the data nodes. The gain
+definitely benefits from horizontal scaling the data nodes. The gain
 is slightly sub-linear since there is some slight overhead XXXXXXX in
 what?  XXXXXXX.
 
@@ -150,8 +145,8 @@ XXXXXXXX](http://xxxx).
 
 Ingestion rates depend on many factors, the number of data nodes
 having the most important impact. A good choice of shards also affects
-the performance in a noteworth way. Finally, the hardware specs of the
-nodes themselves obviosly also affect your results: Look out for lots
+the performance in a noteworthy way. Finally, the hardware specs of the
+nodes themselves obviously also affect your results: Look out for lots
 of iops and a balanced amount of CPU and memory. All that taken into
 account we've been able to ingest up to 4,800,750.12 records/sec on a
 cluster of 56 D14v2 nodes with 16 cores each. Cool.
