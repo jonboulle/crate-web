@@ -82,8 +82,8 @@ Azure has several concepts that we needed to understand and make use of to get o
 
 These are some platform specific limitations that influenced our architecture decisions:
 
-- 8000 CPU cores
-- 10000 VMs
+- 8000 CPU cores per region
+- 10000 VMs per region
 - 100 VMs in single availability set
 - 800 resources in single resource group
 - 4096 IP addresses in a virtual network (VNet)
@@ -111,7 +111,6 @@ An ARM template has a simple structure:
 
 It is worth highlighting the resource dependency management in ARM templates, which provide a
 cohesive template structure and reliable deployment of resources.
-
 
 ### Deployment Setup
 
@@ -160,15 +159,16 @@ template as following:
 
 Docker Swarm managers and Consul agents run in the dedicated [Docker Swarm managers group]
 (https://github.com/crate/p-azure/blob/master/arm-templates/docker/swarmmanagers.json).
-The Docker Swarm manager is responsible for the state of the entire Docker Swarm cluster. With a
-single manager the cluster becomes vulnerable to failovers. Therefore, we rely on High Availability
-characteristic of the Docker Swarm cluster by adding two additional manager replica instances.
 
     * 3 Network Interfaces
     * 3 Virtual Machine
     * 6 Microsoft Azure extensions
     * 1 Availability set
     * 1 Storage account
+
+The Docker Swarm manager is responsible for the state of the entire Docker Swarm cluster. With a
+single manager the cluster becomes vulnerable to failovers. Therefore, we rely on High Availability
+characteristic of the Docker Swarm cluster by adding two additional manager replica instances.
 
 #### Crate nodes
 
@@ -183,14 +183,18 @@ satisfying existing constraints, the following structure of the template was pro
     * 1 Availability set
     * 5 Storage accounts
 
+So we were able to proceed with the deployment of scale units iteratively or in parallel.
+
 #### Crate masters
 
 The only difference between the resources in scale and master units is the type of virtual machines
 and their number. Therefore, we use the scale unit
 [ARM template](https://github.com/crate/p-azure/blob/master/arm-templates/docker/scaleunit.json)
 with slightly modified [configuration]
-(https://github.com/crate/p-azure/blob/master/arm-templates/docker masterunit.parameters.json)
-affecting the address space, number of storage account and VM type.
+(https://github.com/crate/p-azure/blob/master/arm-templates/docker masterunit.parameters.json).
+We made an assumption that the Crate master nodes in a cluster with 1001 nodes might be overloaded
+with cluster state updates. Thus, we have chosen the VM type of a greater size compared to one
+Crate data nodes use.
 
 #### Ganglia monitoring
 
