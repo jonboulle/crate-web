@@ -1,13 +1,13 @@
-title: Crate guest post for Azure - Setting up Azure for Crate
+title: How to launch a 1001 Node Crate Cluster on Microsoft Azure Infrastructure
 author: Chris Ward
-description: Setting up a 1001 node Crate cluster on Azure with Docker Swarm
-created: 2016-03-29
+description: We show how to scale your Crate cluster for billions of records and beyond as simple as possible by launching a 1001 node cluster on Microsoft Azure infrastructure.
+created: 2016-03-30
 status: publish
 post_type: post
-tags: azure, arm
+tags: azure, docker, cloud
 category: developernews
 
-# Crate guest post for Azure - Setting up Azure for Crate
+# How to launch a 1001 Node Crate Cluster on Microsoft Azure Infrastructure
 
 [Crate.io](https://crate.io/) is striving to create the most scalable database in our industry;
 we aim to make scaling your data from millions to billions of records and beyond, as simple as
@@ -19,9 +19,10 @@ minds: when taken to the extreme, what is Crate really capable of?
 
 We specifically wanted to:
 
-- Know how Crate would distribute shards and partitions across such a large cluster.
+- Deploy a Crate cluster of 1001 nodes.
 - Examine the overhead added by the cluster management.
 - See at what speeds the cluster could write data.
+- Assess the performance of different configurations of the cluster.
 
 Microsoft Azure generously lent us the use of 8000 cores as the infrastructure for this test and
 engineer time to guide us through problems and questions we might have.
@@ -36,9 +37,9 @@ While discussing the approach of setting up a 1001 node Crate cluster, we immedi
 using [Docker Swarm](https://www.docker.com/products/docker-swarm) to launch Crate. However, we
 also wanted to see how the conventional deployment, using regular packages, would work out.
 
-### Docker Swarm setup
+### Docker Swarm Setup
 
-Our initial approach was to start the Crate cluster in containerized environment using
+Our initial approach was to start the Crate cluster in a containerized environment using
 [Docker](https://www.docker.com), [Docker Swarm](https://www.docker.com/products/docker-swarm)
 for scheduling Crate instances and [Consul](https://www.consul.io/) for node discovery in a Swarm
 cluster. The solution has its pros and cons. Scheduling Crate nodes, and being able to change
@@ -48,7 +49,7 @@ overhead in the Crate cluster setup. For example, Consul and Swarm cluster must 
 Moreover, the elaborate setup results in higher network load and additional connections introduced
 by backend clusters.
 
-### Plain Crate setup
+### Conventional Crate Setup
 
 For this reason, we wanted to be certain that the high network traffic was not due to Crate, so
 our next plan was to go back to basics and eliminate other potential sources of noise. Therefore,
@@ -94,11 +95,11 @@ These are some platform specific limitations that influenced our architecture de
 (https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/), a
 json formatted file that provisions all the resources and commands to be run for your application
 in a single operation. These templates are used in conjunction with the Azure command line tool to
-trigger a complex cluster quickly.
+trigger a complex cluster deployment quickly.
 
 An ARM template has a simple structure:
 
-```bash
+```json
 {
    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
    "contentVersion": "",
@@ -146,7 +147,7 @@ resourceId ([resourceGroupName], resourceType, resourceName1, [resourceName2]...
 For instance, we reference the virtual network from the network resource group in each of ARM
 template as following:
 
-```bash
+```json
     ...
     "virtualNetworkName": "vnet1k1",
     "resourceGroupNetworkName": "1k1network",
@@ -158,7 +159,7 @@ template as following:
 
 #### Docker Swarm managers
 
-Docker Swarm managers and Consul agents run in the dedicated [Docker Swarm managers] group
+Docker Swarm managers and Consul agents run in the dedicated [Docker Swarm managers group]
 (https://github.com/crate/p-azure/blob/master/arm-templates/docker/swarmmanagers.json).
 
     * 3 Network Interfaces
@@ -192,7 +193,7 @@ effecting the address space, number of storage account and VM type.
 #### Ganglia monitoring
 
 Yet another resource group is
-[ganglia monitoring](https://github.com/crate/p-azure/tree/master/arm-templates/ganglia). For each
+[Ganglia monitoring](https://github.com/crate/p-azure/tree/master/arm-templates/ganglia). For each
 scale and master unit we assign a dedicated VM to collect and store aggregated metrics into a
 storage engine like [RRD](http://www.fromdual.com/round-robin-database-storage-engine).
 
@@ -204,12 +205,11 @@ must be created.
 
 
 ```bash
-    azure group create -n <resourcegroup> -l <location>
-
-    azure group deployment create \
-        -f azuredeploy.json \
-        -e azuredeploy.parameters.json \
-        -g <resourcegroup>
+azure group create -n <resourcegroup> -l <location>
+azure group deployment create \
+    -f azuredeploy.json \
+    -e azuredeploy.parameters.json \
+    -g <resourcegroup>
 ```
 
 
@@ -219,10 +219,10 @@ For those interested and keeping count, here's the total Azure VMs we made use o
 how [Azure references](https://azure.microsoft.com/en-us/documentation/articles/
 virtual-machines-size-specs/#standard-tier-dv2-series) them:
 
-- **12x Ganglia VMs**: _Standard_D4_v2_ (8 cores, 28GB RAM, 400GB local SSD)
-- **3x Swarm Manager VMs**: _Standard_D14_v2_ (16 cores, 112GB RAM, 800GB local SSD)
-- **3x Crate Master VMs**: _Standard_D5_v2_ (16 cores, 56GB RAM, 800GB local SSD)
-- **1100x Crate Node VMs**: _Standard_D12_v2_ (4 cores, 28GB RAM, 200GB local SSD)
+- 12x **Ganglia VMs**: _Standard_D4_v2_ (8 cores, 28GB RAM, 400GB local SSD)
+- 3x **Swarm Manager VMs**: _Standard_D14_v2_ (16 cores, 112GB RAM, 800GB local SSD)
+- 3x **Crate Master VMs**: _Standard_D5_v2_ (16 cores, 56GB RAM, 800GB local SSD)
+- 1100x **Crate Node VMs**: _Standard_D12_v2_ (4 cores, 28GB RAM, 200GB local SSD)
 
 That all adds up to a gigantic **4448** cores and **30968GB** RAM, **just** for the Crate instances.
 
