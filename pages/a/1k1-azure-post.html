@@ -9,9 +9,8 @@ category: developernews
 
 # How to launch a 1001 Node Crate Cluster on Microsoft Azure Infrastructure
 
-[Crate.io](https://crate.io/) is striving to create the most scalable database in our industry;
-we aim to make scaling your data from millions to billions of records and beyond, as simple as
-possible.
+[Crate.io](https://crate.io/) is striving to be the most scalable database in our industry; we aim
+to make scaling your data from millions to billions of records and beyond, as simple as possible.
 
 We have clients who write and query gigabytes of data a minute, store terabytes a day and love the
 performance and stability that Crate offers. But the question always remained at the back of our
@@ -28,7 +27,7 @@ Microsoft Azure generously lent us the use of 8000 cores as the infrastructure f
 engineer time to guide us through problems and questions we might have.
 
 Microsoft wanted to show that their Azure platform was reliable and capable enough for a project
-that would scale rapidly and so resource intensive.
+that would scale rapidly and is so resource intensive.
 
 
 ## Plan
@@ -161,6 +160,9 @@ template as following:
 
 Docker Swarm managers and Consul agents run in the dedicated [Docker Swarm managers group]
 (https://github.com/crate/p-azure/blob/master/arm-templates/docker/swarmmanagers.json).
+The Docker Swarm manager is responsible for the state of the entire Docker Swarm cluster. With a
+single manager the cluster becomes vulnerable to failovers. Therefore, we rely on High Availability
+characteristic of the Docker Swarm cluster by adding two additional manager replica instances.
 
     * 3 Network Interfaces
     * 3 Virtual Machine
@@ -188,7 +190,7 @@ and their number. Therefore, we use the scale unit
 [ARM template](https://github.com/crate/p-azure/blob/master/arm-templates/docker/scaleunit.json)
 with slightly modified [configuration]
 (https://github.com/crate/p-azure/blob/master/arm-templates/docker masterunit.parameters.json)
-effecting the address space, number of storage account and VM type.
+affecting the address space, number of storage account and VM type.
 
 #### Ganglia monitoring
 
